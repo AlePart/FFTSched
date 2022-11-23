@@ -8,11 +8,6 @@
 #include "scheduler.h"
 #include <stdio.h>
 
-#define RAM_START         (0x20000000u)
-#define RAM_SIZE          (128 * 1024) // 128 KB
-
-#define MAIN_STACK        (RAM_START + RAM_SIZE)
-#define TASK_STACK_SIZE   (1024u)
 
 #define TASK_NUMBER_MAX   (16)
 
@@ -22,6 +17,8 @@
 uint32_t __uCurrentTaskIdx = 0;
 uint32_t __puTasksPSP[TASK_NUMBER_MAX] = {0};
 uint8_t __canProcess = 0;
+tSCHEDULER_INIT __schedInit;
+uint32_t __main_stack;
 
 // return PSP value stored in slot at __uCurrentTaskIdx index
 uint32_t get_current_psp() {
@@ -49,7 +46,7 @@ void init_task(void (*handler)) {
   }
 
   // calculate new PSP
-  uint32_t* psp = (uint32_t*)(MAIN_STACK - (i+1)*TASK_STACK_SIZE);
+  uint32_t* psp = (uint32_t*)(__schedInit.RAM_START + __schedInit.RAM_SIZE - (i+1)*__schedInit.TASK_STACK_SIZE);
   *(--psp) = 0x01000000u; // Dummy xPSR, just enable Thumb State bit;
       *(--psp) = (uint32_t) handler; // PC
       *(--psp) = 0xFFFFFFFDu; // LR with EXC_RETURN to return to Thread using PSP
@@ -78,8 +75,9 @@ void idle()
 		__asm volatile("NOP");
 	}
 }
-void init_scheduler()
+void init_scheduler(tSCHEDULER_INIT init_struct)
 {
+	__schedInit = init_struct;
 	init_task(idle);
 }
 void start_scheduler() {
